@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.log
+media/
+staticfiles/
+.env
+
+# node/vite 
+frontend/node_modules/
+frontend/dist/
+
+# docker
+pg_data/
+.vscode/
+.DS_Store
