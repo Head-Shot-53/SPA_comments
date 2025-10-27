@@ -145,3 +145,12 @@ CACHES = {
         "KEY_PREFIX": "spa_comments",
     }
 }
+
+ASGI_APPLICATION = "spa_comments.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {"hosts": [("sc_redis", 6379)]},
+    }
+}
