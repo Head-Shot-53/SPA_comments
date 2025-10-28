@@ -10,9 +10,25 @@ from django.shortcuts import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.http import QueryDict
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
+
 
 class CommentListCreateView(generics.ListCreateAPIView):
     serializer_class = CommentSerializer 
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        channel_layer = get_channel_layer()
+        payload = {
+            "kind": "root_created",
+            "comment": CommentSerializer(instance).data,
+        }
+        async_to_sync(channel_layer.group_send)(
+            "comments",
+            {"type": "ws_comment_created", "payload": payload}
+        )
 
     def get_queryset(self):
         qs = Comment.objects.select_related('author').filter(parent__isnull=True)
@@ -46,6 +62,19 @@ class ReplyListCreateView(generics.ListCreateAPIView):
     """
     serializer_class = CommentSerializer
 
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        channel_layer = get_channel_layer()
+        payload = {
+            "kind": "reply_created",
+            "comment": CommentSerializer(instance).data,
+            "parent_id": instance.parent_id,
+        }
+        async_to_sync(channel_layer.group_send)(
+            "comments",
+            {"type": "ws_comment_created", "payload": payload}
+        )
+        
     def get_queryset(self):
         parent_id = self.kwargs["pk"]
         return (
