@@ -4,9 +4,11 @@ services:
   # === Backend (Django ASGI + WebSockets) ===
   - type: web
     name: spa-comments-backend
-    env: docker
+    runtime: docker
     rootDir: backend
-    dockerfilePath: backend/Dockerfile
+    dockerfilePath: Dockerfile
+    # dockerContext за замовчуванням = rootDir; можна опустити або залишити явно:
+    # dockerContext: .
     plan: starter
     autoDeploy: true
     envVars:
@@ -49,16 +51,18 @@ services:
       name: media-disk
       mountPath: /app/media
       sizeGB: 5
+    # Для Docker сервіс Render запускає CMD з Dockerfile; якщо потрібно — можна додати:
+    # dockerCommand: "daphne -b 0.0.0.0 -p $PORT spa_comments.asgi:application"
 
   # === Celery worker ===
   - type: worker
     name: spa-comments-worker
-    env: docker
+    runtime: docker
     rootDir: backend
-    dockerfilePath: backend/Dockerfile
+    dockerfilePath: Dockerfile
     plan: starter
     autoDeploy: true
-    startCommand: "celery -A spa_comments worker -l info"
+    dockerCommand: "celery -A spa_comments worker -l info"
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -85,12 +89,12 @@ services:
   # === Celery beat ===
   - type: worker
     name: spa-comments-beat
-    env: docker
+    runtime: docker
     rootDir: backend
-    dockerfilePath: backend/Dockerfile
+    dockerfilePath: Dockerfile
     plan: starter
     autoDeploy: true
-    startCommand: "celery -A spa_comments beat -l info"
+    dockerCommand: "celery -A spa_comments beat -l info"
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -131,6 +135,11 @@ services:
   - type: keyvalue
     name: spa-comments-redis
     plan: starter
+    # MUST HAVE: список дозволених IP для зовнішніх з’єднань
+    # (для простоти відкриваємо всім; за потреби звузиш діапазон)
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: everywhere
 
 databases:
   - name: spa-comments-db
