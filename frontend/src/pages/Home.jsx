@@ -1,6 +1,7 @@
 import CommentForm from "../components/CommentForm";
 import CommentList from "../components/CommentList";
 import AuthPanel from "../components/AuthPanel"; 
+import LoginBar from "../components/LoginForm";
 
 export default function Home() {
   return (
@@ -9,6 +10,8 @@ export default function Home() {
 
       {/* Панель авторизації */}
       <AuthPanel />
+
+      {/* <LoginBar /> */}
 
       {/* Форма коментарів */}
       <CommentForm
