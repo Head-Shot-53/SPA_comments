@@ -1,5 +1,3 @@
-# render.yaml — Blueprint для Render
-
 services:
   # === Backend (Django ASGI + WebSockets) ===
   - type: web
@@ -7,8 +5,7 @@ services:
     runtime: docker
     rootDir: backend
     dockerfilePath: Dockerfile
-    # dockerContext за замовчуванням = rootDir; можна опустити або залишити явно:
-    # dockerContext: .
+    
     plan: starter
     autoDeploy: true
     envVars:
@@ -143,4 +140,5 @@ services:
 
 databases:
   - name: spa-comments-db
-    plan: starter
+    plan: free         
+    region: frankfurt
