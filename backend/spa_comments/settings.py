@@ -14,6 +14,8 @@ import os
 from pathlib import Path
 from celery.schedules import crontab
 
+from datetime import timedelta
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -41,6 +43,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     "rest_framework",
+    "rest_framework_simplejwt",
+    "drf_spectacular",
+    "drf_spectacular_sidecar",
 
     'comments_app',
 ]
@@ -131,6 +136,8 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
@@ -138,8 +145,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,
+
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.AllowAny", 
+    ),
 }
 
 
@@ -174,4 +189,35 @@ CELERY_BEAT_SCHEDULE = {
         "task": "comments_app.tasks.cleanup_old_data",
         "schedule": crontab(minute="*/10"),
     },
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "SPA Comments API",
+    "DESCRIPTION": "Comments API with JWT, CAPTCHA, media & WS.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,  # окремий /api/schema/
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": r"/api",  # документуємо тільки /api/*
+
+    # робимо кнопку Authorize з Bearer токеном
+    "SECURITY": [{"BearerAuth": []}],
+    "APPEND_COMPONENTS": {
+        "securitySchemes": {
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+            }
+        }
+    },
+
+    "SERVE_USE_CDN": False,
+
+    # зберігає токен у UI між перезавантаженнями
+    "SWAGGER_UI_SETTINGS": {"persistAuthorization": True},
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 }

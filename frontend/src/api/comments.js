@@ -1,9 +1,9 @@
-import { api } from "./client";
+import api from "../api/client";
 
 // Comments
 export const listComments = async ({ page = 1, sort = "date", order = "desc" } = {}) => {
   const { data } = await api.get("/comments/", { params: { page, sort, order } });
-  return data; // DRF pagination: {count, next, previous, results}
+  return data; 
 };
 
 export const createComment = async (payload) => {
@@ -30,7 +30,7 @@ export const createReply = async (commentId, payload) => {
 // CAPTCHA
 export const getCaptcha = async () => {
   const { data } = await api.get("/captcha/");
-  return data; // { token, image }
+  return data; 
 };
 
 // Attachments
