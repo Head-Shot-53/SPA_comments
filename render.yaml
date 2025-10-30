@@ -1,16 +1,5 @@
-services:
-  - type: web
-    name: spa-comments-web
-    env: python
-    region: frankfurt
-    plan: starter
-    buildCommand: |
-      pip install -U pip
-      pip install -r requirements.txt
-      python manage.py collectstatic --noinput
-    startCommand: gunicorn spa_comments.wsgi:application --workers=3 --timeout 90 --bind 0.0.0.0:$PORT
-    healthCheckPath: /api/health/
-    autoDeploy: true
+envVarGroups:
+  - name: spa-comments-common
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: spa_comments.settings
@@ -26,6 +15,15 @@ services:
         value: https://spa-comments-frontend.onrender.com
       - key: MEDIA_ROOT
         value: /data/media
+
+services:
+  - type: web
+    name: spa-comments-web
+    env: python
+    region: frankfurt
+    plan: starter
+    envVars:
+      - fromGroup: spa-comments-common
       - key: REDIS_URL
         fromService:
           type: redis
@@ -35,6 +33,13 @@ services:
         fromDatabase:
           name: spa-comments-postgres
           property: connectionString
+    buildCommand: |
+      pip install -U pip
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+    startCommand: gunicorn spa_comments.wsgi:application --workers=3 --timeout=90 --bind 0.0.0.0:$PORT
+    healthCheckPath: /api/health/
+    autoDeploy: true
     disk:
       name: media
       mountPath: /data
@@ -47,16 +52,8 @@ services:
     env: python
     region: frankfurt
     plan: starter
-    buildCommand: |
-      pip install -U pip
-      pip install -r requirements.txt
-    startCommand: celery -A spa_comments worker -l info --concurrency=2
-    autoDeploy: true
     envVars:
-      - key: DJANGO_SETTINGS_MODULE
-        value: spa_comments.settings
-      - key: SECRET_KEY
-        sync: false
+      - fromGroup: spa-comments-common
       - key: REDIS_URL
         fromService:
           type: redis
@@ -66,22 +63,19 @@ services:
         fromDatabase:
           name: spa-comments-postgres
           property: connectionString
+    buildCommand: |
+      pip install -U pip
+      pip install -r requirements.txt
+    startCommand: celery -A spa_comments worker -l info --concurrency=2
+    autoDeploy: true
 
   - type: worker
     name: spa-comments-beat
     env: python
     region: frankfurt
     plan: starter
-    buildCommand: |
-      pip install -U pip
-      pip install -r requirements.txt
-    startCommand: celery -A spa_comments beat -l info
-    autoDeploy: true
     envVars:
-      - key: DJANGO_SETTINGS_MODULE
-        value: spa_comments.settings
-      - key: SECRET_KEY
-        sync: false
+      - fromGroup: spa-comments-common
       - key: REDIS_URL
         fromService:
           type: redis
@@ -91,11 +85,18 @@ services:
         fromDatabase:
           name: spa-comments-postgres
           property: connectionString
+    buildCommand: |
+      pip install -U pip
+      pip install -r requirements.txt
+    startCommand: celery -A spa_comments beat -l info
+    autoDeploy: true
 
-  - type: static
+  - type: static_site
     name: spa-comments-frontend
-    env: static
-    buildCommand: npm ci && npm run build
+    buildCommand: |
+      cd frontend
+      npm ci
+      npm run build
     staticPublishPath: frontend/dist
     routes:
       - type: rewrite
