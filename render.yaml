@@ -1,117 +1,137 @@
-envVarGroups:
-  - name: spa-comments-common
-    envVars:
-      - key: DJANGO_SETTINGS_MODULE
-        value: spa_comments.settings
-      - key: DEBUG
-        value: "False"
-      - key: SECRET_KEY
-        generateValue: true
-      - key: ALLOWED_HOSTS
-        value: spa-comments-web.onrender.com
-      - key: CSRF_TRUSTED_ORIGINS
-        value: https://spa-comments-web.onrender.com,https://spa-comments-frontend.onrender.com
-      - key: CORS_ALLOWED_ORIGINS
-        value: https://spa-comments-frontend.onrender.com
-      - key: MEDIA_ROOT
-        value: /data/media
+# render.yaml — Blueprint для Render
 
 services:
+  # === Backend (Django ASGI + WebSockets) ===
   - type: web
-    name: spa-comments-web
-    env: python
-    region: frankfurt
+    name: spa-comments-backend
+    env: docker
+    rootDir: backend
+    dockerfilePath: backend/Dockerfile
     plan: starter
+    autoDeploy: true
     envVars:
-      - fromGroup: spa-comments-common
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: spa-comments-redis
-          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: "*"
       - key: DATABASE_URL
         fromDatabase:
-          name: spa-comments-postgres
+          name: spa-comments-db
           property: connectionString
-    buildCommand: |
-      pip install -U pip
-      pip install -r requirements.txt
-      python manage.py collectstatic --noinput
-    startCommand: gunicorn spa_comments.wsgi:application --workers=3 --timeout=90 --bind 0.0.0.0:$PORT
-    healthCheckPath: /api/health/
-    autoDeploy: true
+      - key: REDIS_URL
+        fromService:
+          name: spa-comments-redis
+          type: keyvalue
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: spa-comments-redis
+          type: keyvalue
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: spa-comments-redis
+          type: keyvalue
+          property: connectionString
+      - key: MEDIA_ROOT
+        value: "/app/media"
+      - key: MEDIA_URL
+        value: "/media/"
+      - key: FRONTEND_ORIGIN
+        value: "https://spa-comments-frontend.onrender.com"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://spa-comments-frontend.onrender.com"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://spa-comments-frontend.onrender.com"
     disk:
-      name: media
-      mountPath: /data
-      sizeGB: 1
-    postDeployCommand: |
-      python manage.py migrate --noinput
+      name: media-disk
+      mountPath: /app/media
+      sizeGB: 5
 
+  # === Celery worker ===
   - type: worker
     name: spa-comments-worker
-    env: python
-    region: frankfurt
+    env: docker
+    rootDir: backend
+    dockerfilePath: backend/Dockerfile
     plan: starter
+    autoDeploy: true
+    startCommand: "celery -A spa_comments worker -l info"
     envVars:
-      - fromGroup: spa-comments-common
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: spa-comments-redis
-          property: connectionString
       - key: DATABASE_URL
         fromDatabase:
-          name: spa-comments-postgres
+          name: spa-comments-db
           property: connectionString
-    buildCommand: |
-      pip install -U pip
-      pip install -r requirements.txt
-    startCommand: celery -A spa_comments worker -l info --concurrency=2
-    autoDeploy: true
+      - key: REDIS_URL
+        fromService:
+          name: spa-comments-redis
+          type: keyvalue
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: spa-comments-redis
+          type: keyvalue
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: spa-comments-redis
+          type: keyvalue
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        sync: false
 
+  # === Celery beat ===
   - type: worker
     name: spa-comments-beat
-    env: python
-    region: frankfurt
+    env: docker
+    rootDir: backend
+    dockerfilePath: backend/Dockerfile
     plan: starter
+    autoDeploy: true
+    startCommand: "celery -A spa_comments beat -l info"
     envVars:
-      - fromGroup: spa-comments-common
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: spa-comments-redis
-          property: connectionString
       - key: DATABASE_URL
         fromDatabase:
-          name: spa-comments-postgres
+          name: spa-comments-db
           property: connectionString
-    buildCommand: |
-      pip install -U pip
-      pip install -r requirements.txt
-    startCommand: celery -A spa_comments beat -l info
-    autoDeploy: true
+      - key: REDIS_URL
+        fromService:
+          name: spa-comments-redis
+          type: keyvalue
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: spa-comments-redis
+          type: keyvalue
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: spa-comments-redis
+          type: keyvalue
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        sync: false
 
-  - type: static_site
+  # === Frontend (Vite) як Static Site ===
+  - type: web
     name: spa-comments-frontend
-    buildCommand: |
-      cd frontend
-      npm ci
-      npm run build
-    staticPublishPath: frontend/dist
-    routes:
-      - type: rewrite
-        source: "/(.*)"
-        destination: "/index.html"
+    runtime: static
+    rootDir: frontend
+    buildCommand: "npm ci && npm run build"
+    staticPublishPath: "./dist"
     envVars:
       - key: VITE_API_BASE
-        value: https://spa-comments-web.onrender.com/api
+        value: "https://spa-comments-backend.onrender.com/api"
+      - key: VITE_WS_URL
+        value: "wss://spa-comments-backend.onrender.com/ws/comments/"
+
+  # === Redis (Render Key-Value) для Celery/Channels ===
+  - type: keyvalue
+    name: spa-comments-redis
+    plan: starter
 
 databases:
-  - name: spa-comments-postgres
+  - name: spa-comments-db
     plan: starter
-    region: frankfurt
-
-redis:
-  - name: spa-comments-redis
-    plan: starter
-    region: frankfurt
