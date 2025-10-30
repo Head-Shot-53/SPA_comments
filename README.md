@@ -18,7 +18,7 @@ Docker Desktop (https://www.docker.com/products/docker-desktop
 
 Installation:
 1) Clone the project:
-     git clone https://github.com/<your_username>/spa_comments.git
+     git clone https://github.com/Head-Shot-53/SPA_comments.git
 2) cd into spa_comments:
      cd spa_comments
 3) Create .env file. In the root folder (next to docker-compose.yml):
