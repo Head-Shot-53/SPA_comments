@@ -48,7 +48,7 @@ export function connectWS() {
       if (data?.type === "pong" || data?.type === "ping") return;
       listeners.forEach(fn => fn(data));
     } catch {
-      // некоректний JSON — пропускаємо
+      // некоректний JSON  пропускаємо
     }
   };
 

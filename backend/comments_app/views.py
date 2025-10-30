@@ -13,10 +13,14 @@ from django.http import QueryDict
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
+from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 
 class CommentListCreateView(generics.ListCreateAPIView):
-    serializer_class = CommentSerializer 
+    serializer_class = CommentSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -51,29 +55,32 @@ class CommentListCreateView(generics.ListCreateAPIView):
         if order == 'desc':
             field = f'-{field}'
 
-        # друге поле як tie-breaker для стабільного сорту
         return qs.order_by(field, '-id')
-    
+
+   
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
-        ctx["request"] = self.request          
+        ctx["request"] = self.request
         return ctx
 
+
 class CaptchaView(APIView):
-    """
-    GET /api/captcha/ -> {token, image_base64}
-    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]
+
     def get(self, request, *args, **kwargs):
         token, image_b64 = generate_captcha()
-        return Response({'token':token, 'image':image_b64})
-       
-    
+        return Response({'token': token, 'image': image_b64})
+
+
 class ReplyListCreateView(generics.ListCreateAPIView):
     """
-    GET /api/comments/<id>/replies/ -> список відповідей (пагінація DRF)
-    POST /api/comments/<id>/replies/ -> створити відповідь (потрібні author, text, captcha_token/solution)
+    GET /api/comments/<id>/replies/
+    POST /api/comments/<id>/replies/
     """
     serializer_class = CommentSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -87,7 +94,7 @@ class ReplyListCreateView(generics.ListCreateAPIView):
             "comments",
             {"type": "ws_comment_created", "payload": payload}
         )
-        
+
     def get_queryset(self):
         parent_id = self.kwargs["pk"]
         return (
@@ -100,7 +107,6 @@ class ReplyListCreateView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         parent = get_object_or_404(Comment, pk=self.kwargs["pk"])
 
-        # Безпечна копія payload 
         payload = request.data
         if isinstance(payload, QueryDict):
             payload = payload.dict()
@@ -109,12 +115,13 @@ class ReplyListCreateView(generics.ListCreateAPIView):
 
         payload["parent"] = parent.pk
 
-        serializer = self.get_serializer(data=payload)
+        serializer = self.get_serializer(data=payload) 
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-    
+
+
 class AttachmentUploadView(generics.CreateAPIView):
     """
     POST /api/attachments/
@@ -122,3 +129,5 @@ class AttachmentUploadView(generics.CreateAPIView):
     """
     serializer_class = AttachmentSerializer
     parser_classes = [MultiPartParser, FormParser]
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]

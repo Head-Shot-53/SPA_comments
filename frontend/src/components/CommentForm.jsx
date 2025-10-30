@@ -12,13 +12,18 @@ export default function CommentForm({ parentId = null, onCreated }) {
   const [loading, setLoading] = useState(false);
   const taRef = useRef(null);
 
+  // перевірка наявності токена
+  const isAuthed = Boolean(localStorage.getItem("access"));
+
   const loadCaptcha = async () => {
+    if (isAuthed) return; // капча не потрібна залогіненим
     const data = await getCaptcha();
     setCaptcha(data);
     setCaptchaSolution("");
   };
 
-  useEffect(() => { loadCaptcha(); }, []);
+  // підвантажує капчу тільки для анонімів
+  useEffect(() => { loadCaptcha(); }, [isAuthed]);
 
   const onInsert = (open, close) => {
     const ta = taRef.current;
@@ -40,22 +45,28 @@ export default function CommentForm({ parentId = null, onCreated }) {
     e.preventDefault();
     setLoading(true);
     try {
+      // ✅ ОНОВЛЕНИЙ payload
       const payload = {
-        author: {
-          username: author.username.trim(),
-          email: author.email.trim(),
-          homepage: author.homepage.trim() || null,
-        },
         text,
-        captcha_token: captcha.token,
-        captcha_solution: captchaSolution.trim(),
+        ...( !isAuthed ? {
+          author: {
+            username: author.username.trim(),
+            email: author.email.trim(),
+            homepage: author.homepage.trim() || null,
+          },
+          captcha_token: captcha.token,
+          captcha_solution: captchaSolution.trim(),
+        } : {} ),
       };
+
+      // 🛡️ якщо author відсутній/null — не шлемо ключ взагалі
+      if (payload.author == null) delete payload.author;
 
       const created = parentId
         ? await createReply(parentId, payload)
         : await createComment(payload);
 
-      // upload files (optional)
+      // завантаження файлів (опційно)
       for (const f of files) {
         await uploadAttachment(created.id, f);
       }
@@ -65,44 +76,48 @@ export default function CommentForm({ parentId = null, onCreated }) {
       setFiles([]);
       await loadCaptcha();
       onCreated?.(created);
-      } catch (err) {
-        const msg = err?.response?.data
-           ? JSON.stringify(err.response.data)
-           : (err?.message || "Помилка створення коментаря");
-        alert(msg);
-        await loadCaptcha();
-      } finally {
+    } catch (err) {
+      const msg = err?.response?.data
+        ? JSON.stringify(err.response.data)
+        : (err?.message || "Помилка створення коментаря");
+      alert(msg);
+      await loadCaptcha();
+    } finally {
       setLoading(false);
     }
   };
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 bg-neutral-900 p-4 rounded-xl shadow">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <input
-          type="text"
-          placeholder="User Name (латиниця/цифри)"
-          className="p-2 rounded bg-neutral-800 outline-none border border-neutral-700"
-          value={author.username}
-          onChange={(e) => setAuthor((a) => ({ ...a, username: e.target.value }))}
-          required
-        />
-        <input
-          type="email"
-          placeholder="E-mail"
-          className="p-2 rounded bg-neutral-800 outline-none border border-neutral-700"
-          value={author.email}
-          onChange={(e) => setAuthor((a) => ({ ...a, email: e.target.value }))}
-          required
-        />
-        <input
-          type="url"
-          placeholder="Home page (необов’язково)"
-          className="p-2 rounded bg-neutral-800 outline-none border border-neutral-700"
-          value={author.homepage}
-          onChange={(e) => setAuthor((a) => ({ ...a, homepage: e.target.value }))}
-        />
-      </div>
+      
+      {/* Поля автора тільки для анонімів */}
+      {!isAuthed && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <input
+            type="text"
+            placeholder="User Name (латиниця/цифри)"
+            className="p-2 rounded bg-neutral-800 outline-none border border-neutral-700"
+            value={author.username}
+            onChange={(e) => setAuthor((a) => ({ ...a, username: e.target.value }))}
+            required
+          />
+          <input
+            type="email"
+            placeholder="E-mail"
+            className="p-2 rounded bg-neutral-800 outline-none border border-neutral-700"
+            value={author.email}
+            onChange={(e) => setAuthor((a) => ({ ...a, email: e.target.value }))}
+            required
+          />
+          <input
+            type="url"
+            placeholder="Home page (необов’язково)"
+            className="p-2 rounded bg-neutral-800 outline-none border border-neutral-700"
+            value={author.homepage}
+            onChange={(e) => setAuthor((a) => ({ ...a, homepage: e.target.value }))}
+          />
+        </div>
+      )}
 
       <Toolbar onInsert={onInsert} />
 
@@ -138,23 +153,29 @@ export default function CommentForm({ parentId = null, onCreated }) {
         </div>
       </div>
 
-      {/* CAPTCHA */}
-      <div className="flex items-center gap-3">
-        {captcha.image && (
-          <img src={captcha.image} alt="captcha" className="h-14 rounded bg-white" />
-        )}
-        <input
-          type="text"
-          placeholder="Введи символи з картинки"
-          className="p-2 rounded bg-neutral-800 outline-none border border-neutral-700"
-          value={captchaSolution}
-          onChange={(e) => setCaptchaSolution(e.target.value)}
-          required
-        />
-        <button type="button" onClick={loadCaptcha} className="px-3 py-2 rounded bg-neutral-800 hover:bg-neutral-700">
-          Оновити
-        </button>
-      </div>
+      {/* CAPTCHA — тільки для анонімів */}
+      {!isAuthed && (
+        <div className="flex items-center gap-3">
+          {captcha.image && (
+            <img src={captcha.image} alt="captcha" className="h-14 rounded bg-white" />
+          )}
+          <input
+            type="text"
+            placeholder="Введи символи з картинки"
+            className="p-2 rounded bg-neutral-800 outline-none border border-neutral-700"
+            value={captchaSolution}
+            onChange={(e) => setCaptchaSolution(e.target.value)}
+            required
+          />
+          <button
+            type="button"
+            onClick={loadCaptcha}
+            className="px-3 py-2 rounded bg-neutral-800 hover:bg-neutral-700"
+          >
+            Оновити
+          </button>
+        </div>
+      )}
 
       <div className="flex justify-end">
         <button
