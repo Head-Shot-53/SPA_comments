@@ -20,6 +20,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from comments_app.views import RegisterView
+from django.http import HttpResponse
+
+
+def health(_):
+    return HttpResponse("ok")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -28,6 +33,8 @@ urlpatterns = [
     path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/register/", RegisterView.as_view(), name="register"),
+
+    path("api/health/", health),
 ]
 
 if settings.DEBUG:
