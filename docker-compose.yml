@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:15
@@ -17,22 +15,31 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
 
   redis:
     image: redis:7
     container_name: sc_redis
     ports:
       - "6379:6379"
+    restart: unless-stopped
 
   web:
     build:
       context: ./backend
     container_name: sc_web
-    command: sh -c "python manage.py makemigrations && python manage.py migrate && daphne -b 0.0.0.0 -p 8000 spa_comments.asgi:application"
+    command: >
+      sh -c "python manage.py makemigrations &&
+             python manage.py migrate &&
+             daphne -b 0.0.0.0 -p 8000 spa_comments.asgi:application"
     volumes:
       - ./backend:/app
+      - ./media:/media
     env_file:
       - .env
+    environment:
+      CELERY_BROKER_URL: redis://sc_redis:6379/0
+      CELERY_RESULT_BACKEND: redis://sc_redis:6379/0
     depends_on:
       db:
         condition: service_healthy
@@ -40,18 +47,61 @@ services:
         condition: service_started
     ports:
       - "8000:8000"
+    restart: unless-stopped
+
+  # Celery worker  виконує фонові задачі (cleanup, resize, нотифікації)
+  worker:
+    build:
+      context: ./backend
+    container_name: sc_worker
+    command: celery -A spa_comments worker -l info
+    volumes:
+      - ./backend:/app
+      - ./media:/media
+    env_file:
+      - .env
+    environment:
+      CELERY_BROKER_URL: redis://sc_redis:6379/0
+      CELERY_RESULT_BACKEND: redis://sc_redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  # Celery beat  планувальник (запускає cleanup кожні N хвилин)
+  beat:
+    build:
+      context: ./backend
+    container_name: sc_beat
+    command: celery -A spa_comments beat -l info
+    volumes:
+      - ./backend:/app
+      - ./media:/media
+    env_file:
+      - .env
+    environment:
+      CELERY_BROKER_URL: redis://sc_redis:6379/0
+      CELERY_RESULT_BACKEND: redis://sc_redis:6379/0
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
   nginx:
     image: nginx:1.27-alpine
     container_name: sc_nginx
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./media:/media
     ports:
       - "8080:80"
     depends_on:
       - web
-      
+    restart: unless-stopped
+
 volumes:
   pg_data:
-
-  
+  media_data:

@@ -31,20 +31,33 @@ class CommentListCreateView(generics.ListCreateAPIView):
         )
 
     def get_queryset(self):
-        qs = Comment.objects.select_related('author').filter(parent__isnull=True)
+        qs = (
+            Comment.objects
+            .filter(parent__isnull=True)
+            .select_related('author')
+            .prefetch_related('attachments')
+        )
+
         sort = self.request.query_params.get('sort', 'date')
         order = self.request.query_params.get('order', 'desc')
 
-        if sort == 'username':
-            field = 'author__username'
-        if sort == 'email':
-            field = 'author__email'
-        else:
-            field = 'created_at'
+        sort_map = {
+            'date': 'created_at',
+            'username': 'author__username',
+            'email': 'author__email',
+        }
+        field = sort_map.get(sort, 'created_at')
 
         if order == 'desc':
-            field = '-' + field
-        return qs.order_by(field)
+            field = f'-{field}'
+
+        # друге поле як tie-breaker для стабільного сорту
+        return qs.order_by(field, '-id')
+    
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx["request"] = self.request          
+        return ctx
 
 class CaptchaView(APIView):
     """
@@ -87,7 +100,7 @@ class ReplyListCreateView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         parent = get_object_or_404(Comment, pk=self.kwargs["pk"])
 
-        # Безпечна копія payload у звичайний dict
+        # Безпечна копія payload 
         payload = request.data
         if isinstance(payload, QueryDict):
             payload = payload.dict()

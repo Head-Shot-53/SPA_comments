@@ -13,6 +13,8 @@ function AttachmentList({ attachments }) {
 
   if (!attachments || attachments.length === 0) return null;
 
+  const slides = images.map(img => ({ src: img.file }));
+
   return (
     <div className="mt-2 space-y-2">
       {images.length > 0 && (
@@ -26,19 +28,26 @@ function AttachmentList({ attachments }) {
               onClick={() => { setIndex(i); setOpen(true); }}
             />
           ))}
-          <Lightbox
-            open={open}
-            close={() => setOpen(false)}
-            index={index}
-            slides={images.map(img => ({ src: img.file }))}
-          />
+
+          {/* Lightbox відкривається при натисканні */}
+          {open && (
+            <Lightbox
+              open={open}
+              close={() => setOpen(false)}
+              slides={slides}
+              index={index}
+            />
+          )}
         </div>
       )}
+
       {texts.length > 0 && (
         <ul className="list-disc list-inside text-sm text-neutral-300">
           {texts.map((t, i) => (
             <li key={t.id || i}>
-              <a href={t.file} target="_blank" rel="noreferrer">Переглянути TXT</a>
+              <a href={t.file} target="_blank" rel="noreferrer">
+                Переглянути TXT
+              </a>
             </li>
           ))}
         </ul>
@@ -59,15 +68,26 @@ export default function CommentItem({ comment }) {
   };
 
   useEffect(() => {
-    // replies завантажуємо ліниво, коли користувач натисне (або автоматично — на твій смак)
+    // replies завантажуються ліниво при натисканні
   }, []);
 
   return (
     <div className="bg-neutral-900 rounded-xl p-4 border border-neutral-800">
       <div className="text-sm text-neutral-400">
-        {comment.author.username} • {new Date(comment.created_at).toLocaleString()}
+        {comment.author.username} •{" "}
+        {new Date(comment.created_at).toLocaleString()}
         {comment.author.homepage && (
-          <> • <a href={comment.author.homepage} target="_blank" rel="noreferrer">homepage</a></>
+          <>
+            {" "}
+            •{" "}
+            <a
+              href={comment.author.homepage}
+              target="_blank"
+              rel="noreferrer"
+            >
+              homepage
+            </a>
+          </>
         )}
       </div>
 
@@ -79,10 +99,18 @@ export default function CommentItem({ comment }) {
       <AttachmentList attachments={comment.attachments || []} />
 
       <div className="mt-3 flex gap-3 text-sm">
-        <button className="text-blue-400 hover:text-blue-300" onClick={() => setShowReplyForm(v => !v)}>
+        <button
+          className="text-blue-400 hover:text-blue-300"
+          onClick={() => setShowReplyForm(v => !v)}
+        >
           Відповісти
         </button>
-        <button className="text-neutral-400 hover:text-neutral-300" onClick={() => (!loaded ? loadReplies() : setLoaded(v => !v))}>
+        <button
+          className="text-neutral-400 hover:text-neutral-300"
+          onClick={() =>
+            !loaded ? loadReplies() : setLoaded(v => !v)
+          }
+        >
           {loaded ? "Сховати відповіді" : "Показати відповіді"}
         </button>
       </div>
@@ -91,7 +119,10 @@ export default function CommentItem({ comment }) {
         <div className="mt-3">
           <CommentForm
             parentId={comment.id}
-            onCreated={() => { setShowReplyForm(false); loadReplies(); }}
+            onCreated={() => {
+              setShowReplyForm(false);
+              loadReplies();
+            }}
           />
         </div>
       )}

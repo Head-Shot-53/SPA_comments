@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 import os
 from pathlib import Path
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -158,4 +159,19 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {"hosts": [("sc_redis", 6379)]},
     }
+}
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = '/media'
+
+# Celery broker 
+CELERY_BROKER_URL = "redis://sc_redis:6379/0"
+CELERY_RESULT_BACKEND = "redis://sc_redis:6379/0"
+CELERY_TIMEZONE = "Europe/Kyiv"
+
+CELERY_BEAT_SCHEDULE = {
+    "cleanup-every-10-minutes": {
+        "task": "comments_app.tasks.cleanup_old_data",
+        "schedule": crontab(minute="*/10"),
+    },
 }

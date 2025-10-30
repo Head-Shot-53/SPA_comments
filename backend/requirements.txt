@@ -8,3 +8,5 @@ django-redis==5.4.0
 channels==4.1.0
 daphne>=4
 channels-redis==4.2.0
+lxml>=5.2,<6
+celery==5.4.0
