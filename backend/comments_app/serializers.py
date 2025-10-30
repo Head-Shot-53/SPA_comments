@@ -10,6 +10,9 @@ import io
 
 from .validators import sanitize_and_xhtml
 
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+
 
 ALLOWED_TAGS = ["a", "code", "i", "strong"]
 ALLOWED_ATTRS = {"a": ["href", "title", "target", "rel"]}
@@ -19,7 +22,33 @@ USERNAME_RE = re.compile(r"^[A-Za-z0-9]{1,32}$")
 ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".gif"}
 MAX_TXT_BYTES = 100 * 1024
 
+User = get_user_model()
 
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, trim_whitespace=False, style={'input_type': 'password'})
+    password2 = serializers.CharField(write_only=True, trim_whitespace=False, style={'input_type': 'password'})
+
+    class Meta:
+        model = User
+        fields = ("username", "email", "password", "password2")
+        extra_kwargs = {
+            "email": {"required": False, "allow_blank": True},
+        }
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["password2"]:
+            raise serializers.ValidationError({"password": "Passwords do not match."})
+        validate_password(attrs["password"])
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop("password2")
+        password = validated_data.pop("password")
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+    
 class AttachmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attachment
@@ -174,3 +203,4 @@ class CommentSerializer(serializers.ModelSerializer):
             commenter.save(update_fields=["homepage"])
 
         return Comment.objects.create(author=commenter, **validated_data)
+
