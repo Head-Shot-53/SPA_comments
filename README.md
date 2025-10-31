@@ -22,32 +22,32 @@ Installation:
 2) cd into spa_comments:
      cd spa_comments
 3) Create .env file. In the root folder (next to docker-compose.yml):
-    POSTGRES_DB=spa_comments
-    POSTGRES_USER=spa_user
-    POSTGRES_PASSWORD=spa_password
+    DB_NAME=db_name
+    DB_USER=db_user
+    DB_PASSWORD=db_password
     DB_HOST=db
     DB_PORT=5432
-    ALLOWED_HOSTS=localhost
-    TIME_ZONE=Europe/Kyiv
-    
-    DJANGO_SECRET_KEY=change_me_please
+    ALLOWED_HOSTS=host
+    TIME_ZONE=your_timezone
+
+    SECRET_KEY=change_me_please
     DEBUG=True
-4) Build the frontend (before Docker):
-     cd frontend
-     npm ci
-     npm run build
-     cd ..
-5) Start Docker containers (This will start all required services: web, db, redis, worker, beat, and nginx.):
-     docker compose up --build
-   
-6) When you see ``Listening on TCP address 0.0.0.0:8000``. press ctrl + c
-7) Run migrations:
+5) Build the frontend (before Docker):
+     1)cd frontend
+     2)npm ci
+     3)npm run build
+     4)cd ..
+6) Start Docker containers (This will start all required services: web, db, redis, worker, beat, and nginx.):
+     1)docker compose up --build
+     2)docker compose up -d
+7) When you see ``Listening on TCP address 0.0.0.0:8000``: press ctrl + c
+8) Run migrations:
      docker compose exec web python manage.py migrate
-8) Optionally create a superuser:
+9) Optionally create a superuser:
    docker compose exec web python manage.py createsuperuser
-9) Restart the project:
+10) Restart the project:
       docker compose up -d
-10) Open the app:
+11) Open the app:
      http://localhost:8080
 
 -Frontend (React SPA) is served by Nginx
